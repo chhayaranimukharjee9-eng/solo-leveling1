@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solo Leveling Combat OS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --neon-blue: #00d2ff;
+            --neon-blue-glow: rgba(0, 210, 255, 0.6);
+            --neon-blue-dim: rgba(0, 210, 255, 0.15);
+            --neon-red: #ff2a2a;
+            --neon-red-glow: rgba(255, 42, 42, 0.8);
+            --neon-gold: #ffcc00;
+            --neon-gold-glow: rgba(255, 204, 0, 0.8);
+            --neon-pink: #ff2a85;
+            --neon-pink-glow: rgba(255, 42, 133, 0.8);
+            --bg-color: #02040a;
+            --panel-bg: rgba(6, 11, 25, 0.85);
+            --text-main: #d4f0ff;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            background-image: radial-gradient(circle at 50% 50%, #0c1631 0%, #02040a 100%);
+            color: var(--text-main);
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden; user-select: none;
+        }
+
+        .sys-font { font-family: 'Share Tech Mono', monospace; }
+
+        /* CRT Overlay */
+        .scanlines {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.15));
+            background-size: 100% 4px; pointer-events: none; z-index: 100; opacity: 0.8;
+        }
+        .flicker {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 210, 255, 0.02);
+            pointer-events: none; z-index: 99; animation: crt-flicker 0.15s infinite;
+        }
+        @keyframes crt-flicker { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+
+        /* Global HUD */
+        .global-hud { position: fixed; top: 20px; right: 20px; z-index: 200; display: flex; gap: 15px; }
+        .hud-panel {
+            background: rgba(10, 5, 20, 0.8); border: 1px solid var(--neon-pink); padding: 8px 16px;
+            box-shadow: 0 0 15px rgba(255, 42, 133, 0.4), inset 0 0 10px rgba(255, 42, 133, 0.2);
+            display: flex; align-items: center; gap: 10px; border-radius: 4px; transform: skewX(-10deg); transition: all 0.3s;
+        }
+        .hud-panel .hud-inner { transform: skewX(10deg); display: flex; align-items: center; gap: 8px; }
+        .btn-store {
+            background: rgba(0, 210, 255, 0.1); border: 1px solid var(--neon-blue); color: var(--neon-blue);
+            text-shadow: 0 0 5px var(--neon-blue-glow); box-shadow: 0 0 10px var(--neon-blue-dim), inset 0 0 5px var(--neon-blue-dim);
+            cursor: pointer; padding: 8px 16px; border-radius: 4px; transform: skewX(-10deg); transition: all 0.3s; display: flex; align-items: center;
+        }
+        .btn-store:hover { background: rgba(0, 210, 255, 0.2); box-shadow: 0 0 15px var(--neon-blue-glow); transform: skewX(-10deg) scale(1.05); }
+        .btn-store span { transform: skewX(10deg); font-weight: bold; font-family: 'Share Tech Mono', monospace; }
+
+        /* Panel UI */
+        .system-panel {
+            background: var(--panel-bg); backdrop-filter: blur(10px); border: 1px solid rgba(0, 210, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 20px var(--neon-blue-dim), 0 0 15px var(--neon-blue-glow);
+            position: absolute; width: 92%; max-width: 500px; padding: 24px;
+            animation: float 4s ease-in-out infinite; transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transform-origin: center; display: flex; flex-direction: column; max-height: 90vh;
+        }
+        .system-panel.store-panel { max-width: 800px; height: 85vh; }
+        
+        .system-panel::before, .system-panel::after { content: ''; position: absolute; width: 20px; height: 20px; border: 2px solid var(--neon-blue); pointer-events: none; }
+        .system-panel::before { top: -2px; left: -2px; border-right: none; border-bottom: none; box-shadow: -2px -2px 10px var(--neon-blue-glow); }
+        .system-panel::after { bottom: -2px; right: -2px; border-left: none; border-top: none; box-shadow: 2px 2px 10px var(--neon-blue-glow); }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        /* Views */
+        .view-hidden { opacity: 0; pointer-events: none; transform: scale(0.95) translateY(15px); visibility: hidden; z-index: 10; }
+        .view-active { opacity: 1; pointer-events: auto; transform: scale(1) translateY(0); visibility: visible; z-index: 20; }
+
+        /* Typography */
+        .text-glow-blue { color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue-glow); }
+        .text-glow-red { color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red-glow); }
+        .text-glow-gold { color: var(--neon-gold); text-shadow: 0 0 15px var(--neon-gold-glow), 0 0 30px rgba(255,204,0,0.4); }
+        .text-glow-pink { color: var(--neon-pink); text-shadow: 0 0 15px var(--neon-pink-glow), 0 0 30px rgba(255,42,133,0.5); }
+        .btn-close { cursor: pointer; transition: all 0.2s; }
+        .btn-close:hover { color: #ff5555; text-shadow: 0 0 15px #ff5555; transform: scale(1.1); }
+
+        /* Bars */
+        .bar-bg { background: rgba(0, 0, 0, 0.6); border: 1px solid var(--neon-blue); height: 14px; width: 100%; position: relative; transform: skewX(-15deg); box-shadow: inset 0 0 8px rgba(0,0,0,0.8); }
+        .bar-fill { height: 100%; position: relative; transition: width 0.5s ease; }
+        .bar-fill.hp { background: linear-gradient(90deg, #005c8a, #00d2ff); width: 100%; }
+        .bar-fill.mp { background: linear-gradient(90deg, #005c8a, #7dd3fc); width: 100%; }
+        .bar-fill.fatigue { background: #475569; width: 0%; }
+        .bar-fill.progress { background: var(--neon-blue); box-shadow: 0 0 15px var(--neon-blue-glow); width: 0%; }
+        .bar-fill::after { content: ""; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: repeating-linear-gradient(-45deg, rgba(255,255,255,0.15), rgba(255,255,255,0.15) 10px, transparent 10px, transparent 20px); animation: stripemove 1s linear infinite; }
+        @keyframes stripemove { 0% { background-position: 0 0; } 100% { background-position: 28px 0; } }
+
+        /* Scroller */
+        .scroll-list { flex-grow: 1; overflow-y: auto; margin: 10px 0 15px 0; padding-right: 5px; }
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-track { background: rgba(0,0,0,0.5); }
+        .scroll-list::-webkit-scrollbar-thumb { background: var(--neon-blue); }
+
+        /* Quests */
+        .quest-item { transition: all 0.3s; border-bottom: 1px solid var(--neon-blue-dim); padding: 12px 10px; cursor: pointer; display: flex; align-items: center; }
+        .quest-item:hover { background: rgba(0, 210, 255, 0.05); border-color: rgba(0, 210, 255, 0.4); }
+        .custom-cb { appearance: none; width: 22px; height: 22px; border: 2px solid var(--neon-blue); background: rgba(0,0,0,0.5); position: relative; cursor: pointer; margin-right: 15px; flex-shrink: 0; transition: all 0.2s; }
+        .custom-cb:checked { background: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue-glow); }
+        .custom-cb:checked::after { content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 12px; border: solid #000; border-width: 0 3px 3px 0; transform: rotate(45deg); }
+        .quest-item.completed { opacity: 0.5; }
+        .quest-item.completed .q-title { text-decoration: line-through; color: #64748b; text-shadow: none; }
+        .quest-item.completed .q-time { color: #475569; }
+        
+        /* Message Box */
+        .system-msg-box {
+            background: rgba(255, 204, 0, 0.1); border: 1px dashed var(--neon-gold); padding: 8px; border-radius: 4px; min-height: 48px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 0.95rem; color: var(--neon-gold); text-shadow: 0 0 5px var(--neon-gold-glow); transition: all 0.3s ease; line-height: 1.2;
+        }
+        @keyframes pop-in { 0% { transform: scale(0.9); opacity: 0.5; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+        .msg-animate { animation: pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+        /* Store */
+        .store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; padding-bottom: 20px; }
+        .sword-card { background: rgba(0, 0, 0, 0.6); border: 1px solid #333; padding: 15px; display: flex; flex-direction: column; align-items: center; text-align: center; transition: transform 0.2s, box-shadow 0.2s; }
+        .sword-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .rank-E { border-color: #9ca3af; box-shadow: inset 0 0 10px rgba(156,163,175,0.1); }
+        .rank-D { border-color: #4ade80; box-shadow: inset 0 0 10px rgba(74,222,128,0.1); }
+        .rank-C { border-color: #38bdf8; box-shadow: inset 0 0 10px rgba(56,189,248,0.1); }
+        .rank-B { border-color: #c084fc; box-shadow: inset 0 0 10px rgba(192,132,252,0.1); }
+        .rank-A { border-color: #f87171; box-shadow: inset 0 0 10px rgba(248,113,113,0.1); }
+        .rank-S { border-color: #facc15; box-shadow: inset 0 0 15px rgba(250,204,21,0.2); }
+        .sword-icon { font-size: 2.5rem; margin-bottom: 8px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.3)); }
+        .btn-buy { margin-top: 12px; width: 100%; padding: 8px; background: rgba(255,42,133,0.1); border: 1px solid var(--neon-pink); color: var(--neon-pink); cursor: pointer; transition: 0.3s; font-family: 'Share Tech Mono'; font-weight: bold; }
+        .btn-buy:hover { background: rgba(255,42,133,0.3); box-shadow: 0 0 10px var(--neon-pink-glow); }
+        .btn-buy.owned { background: rgba(74, 222, 128, 0.1); border-color: #4ade80; color: #4ade80; cursor: not-allowed; box-shadow: none; }
+        
+        /* Buttons */
+        .btn-action { width: 100%; padding: 12px; background: rgba(0,0,0,0.5); border: 1px solid #475569; color: #475569; font-size: 1.5rem; cursor: not-allowed; transition: all 0.4s; letter-spacing: 5px; font-family: 'Share Tech Mono'; text-transform: uppercase; font-weight: bold; }
+        .btn-action.ready { border-color: var(--neon-gold); color: var(--neon-gold); background: rgba(255, 204, 0, 0.1); text-shadow: 0 0 10px var(--neon-gold-glow); box-shadow: 0 0 15px rgba(255,204,0,0.3), inset 0 0 10px rgba(255,204,0,0.2); cursor: pointer; animation: pulse-gold 1.5s infinite; }
+        .btn-action.ready:hover { background: rgba(255, 204, 0, 0.2); transform: scale(1.02); }
+        .btn-action.back-btn { border-color: var(--neon-blue); color: var(--neon-blue); background: rgba(0, 210, 255, 0.1); cursor: pointer; text-shadow: 0 0 5px var(--neon-blue-glow); font-size: 1.2rem; letter-spacing: 2px; }
+        .btn-action.back-btn:hover { background: rgba(0, 210, 255, 0.2); box-shadow: 0 0 15px var(--neon-blue-glow); transform: scale(1.02); }
+        @keyframes pulse-gold { 0%, 100% { box-shadow: 0 0 15px rgba(255, 204, 0, 0.3); } 50% { box-shadow: 0 0 30px var(--neon-gold-glow); } }
+        
+        /* Toast Alert */
+        .toast-box { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 4px; font-family: 'Share Tech Mono', monospace; font-weight: bold; z-index: 1000; transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; }
+        .toast-box.show { top: 30px; }
+        .toast-error { background: rgba(255, 42, 42, 0.9); border: 2px solid var(--neon-red); color: white; box-shadow: 0 0 20px var(--neon-red-glow); }
+        .toast-success { background: rgba(0, 210, 255, 0.9); border: 2px solid var(--neon-blue); color: black; box-shadow: 0 0 20px var(--neon-blue-glow); }
+
+        /* Buff Buttons */
+        .btn-buff { background: rgba(0, 0, 0, 0.6); border: 1px solid var(--neon-blue); color: var(--neon-blue); text-shadow: 0 0 5px var(--neon-blue-glow); box-shadow: 0 0 10px rgba(0,210,255,0.2), inset 0 0 5px rgba(0,210,255,0.1); cursor: pointer; transition: all 0.3s; padding: 14px; font-family: 'Share Tech Mono'; font-weight: bold; letter-spacing: 2px; width: 100%; text-align: center; font-size: 1.1rem; }
+        .btn-buff:hover { transform: scale(1.02); }
+        .btn-buff.recovery { border-color: #4ade80; color: #4ade80; text-shadow: 0 0 5px rgba(74,222,128,0.8); }
+        .btn-buff.meditation { border-color: #c084fc; color: #c084fc; text-shadow: 0 0 5px rgba(192,132,252,0.8); }
+        .btn-buff.freetime { border-color: #facc15; color: #facc15; text-shadow: 0 0 5px rgba(250,204,21,0.8); }
+        .btn-buff.mystery { border-color: #ff2a85; color: #ff2a85; text-shadow: 0 0 5px rgba(255,42,133,0.8); }
+        .btn-buff.selected { box-shadow: 0 0 20px rgba(255,255,255,0.6), inset 0 0 10px rgba(255,255,255,0.3); transform: scale(1.05); background: rgba(255,255,255,0.1); border-color: white; color: white; text-shadow: 0 0 10px white; }
+        .gift-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; margin-bottom: 10px; }
+        
+        /* Penalty Zone */
+        .penalty-flash {
+            background: rgba(20, 0, 0, 0.9) !important;
+            border-color: var(--neon-red) !important;
+            animation: flash-red 0.5s infinite alternate !important;
+            z-index: 500 !important;
+            max-width: 100% !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0 !important;
+        }
+        @keyframes flash-red {
+            from { box-shadow: inset 0 0 50px rgba(255, 0, 0, 0.2); }
+            to { box-shadow: inset 0 0 250px rgba(255, 0, 0, 0.9); }
+        }
+
+        /* Frozen Timer */
+        .timer-frozen {
+            color: #4ade80 !important;
+            text-shadow: 0 0 15px rgba(74, 222, 128, 0.8) !important;
+            animation: none !important;
+            font-size: 1.1rem;
+        }
+
+        /* Firebase Loading Overlay */
+        #loader {
+            position: fixed; inset: 0; background: var(--bg-color); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 3px solid rgba(0, 210, 255, 0.3); border-radius: 50%;
+            border-top-color: var(--neon-blue); animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+    <div class="flicker"></div>
+    <div id="toast" class="toast-box"></div>
+
+    <div id="loader">
+        <div class="spinner mb-4"></div>
+        <div class="sys-font text-glow-blue tracking-widest uppercase">Connecting to System...</div>
+    </div>
+
+    <!-- GLOBAL HUD -->
+    <div class="global-hud">
+        <button id="btn-open-store" class="btn-store view-hidden"><span>🛒 STORE</span></button>
+        <div class="hud-panel">
+            <div class="hud-inner">
+                <span class="text-xl">💎</span>
+                <span id="global-diamond-total" class="sys-font text-2xl font-bold text-glow-pink tracking-wider">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 1. STATUS WINDOW ================= -->
+    <div id="win-status" class="system-panel view-hidden">
+        <div class="flex justify-between items-center mb-6 border-b border-[#00d2ff55] pb-3">
+            <h1 class="sys-font text-3xl font-bold text-glow-blue tracking-[0.2em] uppercase">[ STATUS ]</h1>
+            <span id="close-status" class="sys-font text-2xl text-glow-red font-bold btn-close px-2" title="Close">[ X ]</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-6 text-lg tracking-widest uppercase">
+            <div><span class="text-gray-400 sys-font text-xs block">NAME</span><span class="font-bold">Subhajit</span></div>
+            <div><span class="text-gray-400 sys-font text-xs block">LEVEL</span><span id="stat-level" class="font-bold text-glow-blue text-xl">1</span></div>
+            <div><span class="text-gray-400 sys-font text-xs block">JOB</span><span class="font-bold">Shadow Monarch</span></div>
+            <div><span class="text-gray-400 sys-font text-xs block">TITLE</span><span class="font-bold">S-Rank Hunter</span></div>
+        </div>
+        <div class="space-y-4 mb-6">
+            <div><div class="flex justify-between sys-font text-sm font-bold mb-1"><span class="text-glow-blue uppercase">HP</span><span class="text-gray-300">100 / 100</span></div><div class="bar-bg"><div class="bar-fill hp"></div></div></div>
+            <div><div class="flex justify-between sys-font text-sm font-bold mb-1"><span class="text-blue-300 uppercase">MP</span><span class="text-gray-300">10 / 10</span></div><div class="bar-bg"><div class="bar-fill mp"></div></div></div>
+            <div><div class="flex justify-between sys-font text-sm font-bold mb-1"><span class="text-gray-500 uppercase">Fatigue</span><span class="text-gray-500">0 / 100</span></div><div class="bar-bg" style="border-color: #475569;"><div class="bar-fill fatigue"></div></div></div>
+        </div>
+    </div>
+
+
+    <!-- ================= 2. DAILY QUEST WINDOW ================= -->
+    <div id="win-quest" class="system-panel view-hidden" style="height: 85vh;">
+        <div class="text-center mb-1">
+            <h1 class="sys-font text-3xl font-bold text-glow-blue tracking-[0.1em] uppercase">[ DAILY QUEST ]</h1>
+        </div>
+        <div class="text-center mb-3">
+            <span class="sys-font text-glow-red text-xl font-bold tracking-widest" id="countdown-timer">
+                Loading Timer...
+            </span>
+        </div>
+        <div class="px-2 mb-3">
+            <div class="flex justify-between sys-font text-sm font-bold mb-1 tracking-widest">
+                <span class="text-glow-blue" id="lbl-curr-lvl">LVL 1</span>
+                <span class="text-glow-gold" id="lbl-progress">0%</span>
+                <span class="text-gray-500" id="lbl-next-lvl">LVL 2</span>
+            </div>
+            <div class="bar-bg"><div id="progress-bar" class="bar-fill progress"></div></div>
+        </div>
+
+        <div id="sys-msg-box" class="system-msg-box sys-font">
+            [ SYSTEM ] গ্রাইন্ডিং শুরু করো, আর্কিটেক্ট! রাত ১২টার আগে শেষ চাই! ⚡
+        </div>
+
+        <div class="scroll-list" id="task-container">
+            <!-- Tasks injected via JS -->
+        </div>
+
+        <div class="pt-2">
+            <button id="btn-levelup" disabled class="btn-action">Level Up</button>
+        </div>
+    </div>
+
+
+    <!-- ================= 3. REWARD WINDOW ================= -->
+    <div id="win-reward" class="system-panel view-hidden flex-col items-center justify-center text-center" style="height: 75vh;">
+        <h1 class="sys-font text-3xl font-bold text-glow-gold tracking-widest uppercase mb-2 leading-tight">
+            [ QUEST CLEARED ]
+        </h1>
+        <div class="my-4 w-full border-y border-[rgba(255,42,133,0.3)] py-4 bg-[rgba(255,42,133,0.05)]">
+            <p class="sys-font text-md text-[#d4f0ff] tracking-widest uppercase mb-2">Reward Acquired</p>
+            <div class="text-5xl font-bold text-glow-pink animate-pulse" id="reward-amount">+0 💎</div>
+        </div>
+        
+        <p class="sys-font text-lg text-glow-blue tracking-widest uppercase mb-4 mt-2">SELECT 2 UNBELIEVABLE GIFTS</p>
+        
+        <div class="gift-grid">
+            <button class="btn-buff recovery buff-selectable" data-name="RECOVERY">[ 1. RECOVERY ]</button>
+            <button class="btn-buff meditation buff-selectable" data-name="MEDITATION">[ 2. MEDITATION ]</button>
+            <button class="btn-buff freetime buff-selectable" data-name="FREE TIME">[ 3. FREE TIME ]</button>
+            <button class="btn-buff mystery buff-selectable" data-name="S-RANK MYSTERY">[ 4. MYSTERY ]</button>
+        </div>
+
+        <div class="w-full mt-2">
+            <button id="btn-claim-gifts" disabled class="btn-action w-full" style="font-size: 1.1rem; letter-spacing: 2px;">CLAIM GIFTS & FREEZE SYSTEM</button>
+        </div>
+    </div>
+
+
+    <!-- ================= 4. PENALTY ZONE ================= -->
+    <div id="win-penalty" class="system-panel view-hidden flex-col items-center justify-center text-center penalty-flash">
+        <h1 class="sys-font text-6xl font-bold text-glow-red tracking-[0.2em] uppercase mb-6">
+            [ PENALTY ZONE ]
+        </h1>
+        <p class="sys-font text-3xl text-red-300 font-bold mb-4 uppercase">Quest Failed</p>
+        <p class="text-xl text-red-400 mb-12 uppercase tracking-widest">Time expired at Midnight.<br>Prepare to survive the centipedes.</p>
+        
+        <button id="btn-accept-penalty" class="btn-action border-red-500 text-red-500 hover:bg-red-900/50 hover:text-white transition-all shadow-[0_0_20px_rgba(255,42,42,0.5)]">
+            ACCEPT PENALTY
+        </button>
+    </div>
+
+
+    <!-- ================= 5. MAX LEVEL WINDOW ================= -->
+    <div id="win-max" class="system-panel view-hidden flex-col items-center justify-center text-center" style="height: 50vh;">
+        <h1 class="sys-font text-4xl font-bold text-glow-gold tracking-widest uppercase mb-6 leading-tight">
+            [ MAX LEVEL 30 REACHED ]
+        </h1>
+        <p class="text-xl tracking-widest uppercase text-gray-300 font-bold border-t border-[rgba(255,204,0,0.3)] pt-6">System Mastered <br> You are the Monarch.</p>
+    </div>
+
+
+    <!-- ================= 6. SYSTEM SHOP (STORE) ================= -->
+    <div id="win-store" class="system-panel store-panel view-hidden">
+        <div class="text-center border-b border-[#00d2ff55] pb-3 mb-4">
+            <h1 class="sys-font text-3xl font-bold text-glow-blue tracking-[0.2em] uppercase">[ SYSTEM SHOP ]</h1>
+            <p class="sys-font text-sm text-[#00d2ffaa] tracking-widest">Exchange Pink Diamonds for Weapons</p>
+        </div>
+        <div class="scroll-list store-grid" id="store-container"></div>
+        <div class="pt-4 mt-auto">
+            <button id="btn-close-store" class="btn-action back-btn">BACK TO QUESTS</button>
+        </div>
+    </div>
+
+
+    <!-- Firebase & System Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ================= FIREBASE SETUP =================
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'solo-leveling-os';
+        let firebaseConfig = {};
+        if (typeof __firebase_config !== 'undefined') {
+            try { firebaseConfig = JSON.parse(__firebase_config); } catch (e) {}
+        }
+        
+        let db, auth, user;
+        let isFirebaseActive = false;
+
+        if (Object.keys(firebaseConfig).length > 0) {
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            isFirebaseActive = true;
+        }
+
+        // ================= STATE MANAGEMENT =================
+        function getSystemDay(dateObj) {
+            const d = new Date(dateObj);
+            // System day resets at 1:00 AM. 00:00 to 00:59 counts as the previous day.
+            if (d.getHours() < 1) d.setDate(d.getDate() - 1);
+            return d.toDateString();
+        }
+
+        let playerState = {
+            level: 1,
+            diamonds: 0,
+            ownedSwords: [],
+            completedTasks: [],
+            lastDate: getSystemDay(new Date()),
+            questCompletedForToday: false
+        };
+
+        const maxLevel = 30;
+        let pendingDiamonds = 0;
+        let currentTaskCount = 0;
+        let penaltyTriggered = false;
+
+        // Data
+        const baseTasks = [
+            { title: "50 Push-ups", time: "50 Reps" },
+            { title: "50 Sit-ups", time: "50 Reps" },
+            { title: "50 Squats", time: "50 Reps" },
+            { title: "3km Run", time: "3 km" },
+            { title: "অধোমুখ স্বানাসন (Downward Dog)", time: "1 Min" },
+            { title: "জাম্প স্কোয়াটস", time: "3x15 Reps" },
+            { title: "পিস্টল স্কোয়াট", time: "3x8 Per Leg" },
+            { title: "ভুজঙ্গাসন (Cobra Pose)", time: "3x30 Sec" },
+            { title: "উষ্ট্রাসন (Camel Pose)", time: "3x20 Sec" },
+            { title: "শীর্ষাসন (Headstand)", time: "1-3 Mins" },
+            { title: "বালায়াম (Nail Rubbing)", time: "10-15 Mins" }
+        ];
+
+        const advancedTasks = [
+            { title: "৩০টি পাইক পুশ-আপ (Pike Push-ups)", time: "30 Reps" },
+            { title: "৩০টি ডায়মন্ড পুশ-আপ (Diamond Push-ups)", time: "30 Reps" },
+            { title: "৩০টি হিন্দু পুশ-আপ (Hindu Push-ups)", time: "30 Reps" },
+            { title: "৩০টি হিন্দু স্কোয়াট (Hindu Squats)", time: "30 Reps" }
+        ];
+
+        const masterTasks = [
+            { title: "100 Push-ups", time: "100 Reps" },
+            { title: "100 Sit-ups", time: "100 Reps" },
+            { title: "100 Squats", time: "100 Reps" },
+            { title: "5km Run", time: "5 km" }
+        ];
+
+        const funnyMessages = [
+            "পিস্টল স্কোয়াটে পা কাঁপলে এস-র‍্যাঙ্ক ক্যানসেল! 🤣",
+            "বালায়াম করো, নইলে টাক পড়ে যাবে! 👴🏼😂",
+            "সিস্টেম লক্ষ্য করছে তুমি ফাঁকি দিচ্ছো! 🤨",
+            "দশরথ ফায়ারওয়াল অ্যাক্টিভ তো? 🛡️⚡",
+            "১০০ পুশ-আপ! সাইতামা হওয়ার প্ল্যান নাকি? 🧑‍🦲🤣",
+            "রাত ১২টার আগে শেষ করো, নইলে পেনাল্টি জোন! 💀",
+            "৫ কিমি দৌড়! জিন-উ এর ছায়া ঘামছে! 🏃💨",
+            "ডায়মন্ড পুশ-আপে বুক ফাটলে সিস্টেম দায়ী নয়! 💀💎",
+            "পাইক পুশ-আপে নাক যেন না ফাটে! 👃💥"
+        ];
+
+        const swordData = [
+            { id: 1, name: "Rusty Iron Sword", rank: "E", price: 20, icon: "🗡️" },
+            { id: 2, name: "Goblin's Dagger", rank: "E", price: 35, icon: "🔪" },
+            { id: 3, name: "Chipped Longsword", rank: "E", price: 50, icon: "⚔️" },
+            { id: 4, name: "Novice Blade", rank: "E", price: 65, icon: "🗡️" },
+            { id: 5, name: "Wooden Bokken", rank: "E", price: 80, icon: "🏏" },
+            { id: 6, name: "Steel Shortsword", rank: "D", price: 100, icon: "🗡️" },
+            { id: 7, name: "Guard's Broadsword", rank: "D", price: 125, icon: "⚔️" },
+            { id: 8, name: "Mercenary's Edge", rank: "D", price: 150, icon: "🗡️" },
+            { id: 9, name: "Orcish Cleaver", rank: "D", price: 175, icon: "🪓" },
+            { id: 10, name: "Silver Rapier", rank: "D", price: 200, icon: "🤺" },
+            { id: 11, name: "Knight's Claymore", rank: "C", price: 250, icon: "⚔️" },
+            { id: 12, name: "Blood Katana", rank: "C", price: 300, icon: "🩸" },
+            { id: 13, name: "Assassin's Twin Daggers", rank: "C", price: 350, icon: "⚔️" },
+            { id: 14, name: "Desert Scimitar", rank: "C", price: 400, icon: "🗡️" },
+            { id: 15, name: "Venomous Fang", rank: "C", price: 450, icon: "🐍" },
+            { id: 16, name: "Frostbite Blade", rank: "B", price: 550, icon: "❄️" },
+            { id: 17, name: "Ignis Longsword", rank: "B", price: 650, icon: "🔥" },
+            { id: 18, name: "Stormcaller Edge", rank: "B", price: 750, icon: "⚡" },
+            { id: 19, name: "Vampiric Blade", rank: "B", price: 850, icon: "🦇" },
+            { id: 20, name: "Holy Avenger", rank: "B", price: 950, icon: "✨" },
+            { id: 21, name: "Baruka's Dagger", rank: "A", price: 1100, icon: "🧊" },
+            { id: 22, name: "Demon King's Sword", rank: "A", price: 1250, icon: "😈" },
+            { id: 23, name: "Dragon Bone Greatsword", rank: "A", price: 1400, icon: "🐉" },
+            { id: 24, name: "Shadow Monarch Blade", rank: "A", price: 1600, icon: "🌑" },
+            { id: 25, name: "Sun God's Spear-Sword", rank: "A", price: 1800, icon: "☀️" },
+            { id: 26, name: "Kamish's Wrath", rank: "S", price: 2000, icon: "🔥🗡️" },
+            { id: 27, name: "Sword of Light", rank: "S", price: 2500, icon: "✨⚔️" },
+            { id: 28, name: "Excalibur", rank: "S", price: 3000, icon: "👑" },
+            { id: 29, name: "Void Cutter", rank: "S", price: 4000, icon: "🌌" },
+            { id: 30, name: "Architect's Masterpiece", rank: "S", price: 5000, icon: "👁️‍🗨️" }
+        ];
+
+        // ================= FIREBASE SYNC =================
+        async function loadState() {
+            if (!isFirebaseActive || !user) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'playerData');
+            const snap = await getDoc(docRef);
+            
+            if (snap.exists()) {
+                const data = snap.data();
+                playerState = { ...playerState, ...data };
+            }
+            
+            // Check New Day Logic (1:00 AM Reset Boundary)
+            const today = getSystemDay(new Date());
+            if (playerState.lastDate !== today) {
+                playerState.completedTasks = [];
+                playerState.questCompletedForToday = false;
+                playerState.lastDate = today;
+                await saveState();
+            }
+            updateUIFromState();
+        }
+
+        async function saveState() {
+            if (!isFirebaseActive || !user) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'playerData');
+            await setDoc(docRef, playerState, { merge: true });
+        }
+
+        // ================= AUDIO PENALTY SYSTEM =================
+        let audioCtx = null;
+        let sirenOsc = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        document.body.addEventListener('click', initAudio);
+        document.body.addEventListener('touchstart', initAudio);
+
+        function triggerPenalty() {
+            if (penaltyTriggered) return;
+            penaltyTriggered = true;
+            
+            // Hide all panels, show Penalty
+            document.querySelectorAll('.system-panel').forEach(p => {
+                p.classList.remove('view-active');
+                p.classList.add('view-hidden');
+            });
+            document.getElementById('win-penalty').classList.remove('view-hidden');
+            document.getElementById('win-penalty').classList.add('view-active');
+            document.querySelector('.global-hud').style.display = 'none';
+            
+            // LOUD ALARM using Oscillator
+            initAudio();
+            if (audioCtx) {
+                sirenOsc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                sirenOsc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                sirenOsc.type = 'square';
+                gain.gain.value = 0.5; // Loud
+                
+                let freq = 400;
+                let up = true;
+                setInterval(() => {
+                    if (up) freq += 40; else freq -= 40;
+                    if (freq > 900) up = false;
+                    if (freq < 400) up = true;
+                    if(sirenOsc.frequency) sirenOsc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                }, 30);
+                
+                sirenOsc.start();
+            }
+        }
+
+        document.getElementById('btn-accept-penalty').addEventListener('click', async () => {
+            if (sirenOsc) { sirenOsc.stop(); sirenOsc.disconnect(); }
+            // Acknowledge Penalty -> Reset Day
+            playerState.completedTasks = [];
+            playerState.questCompletedForToday = false;
+            playerState.lastDate = getSystemDay(new Date());
+            await saveState();
+            location.reload(); // Reload fresh
+        });
+
+        // ================= 1:00 AM TIMER & AUTO-RESET =================
+        function startMidnightTimer() {
+            setInterval(() => {
+                const now = new Date();
+                const systemDay = getSystemDay(now);
+                
+                // Real-time Day change detection at exactly 1:00 AM
+                if (playerState.lastDate !== systemDay) {
+                    if (!playerState.questCompletedForToday && playerState.completedTasks.length < currentTaskCount && !penaltyTriggered) {
+                        triggerPenalty();
+                    } else {
+                        // Safely completed yesterday or resetting after penalty, reset for today silently
+                        playerState.completedTasks = [];
+                        playerState.questCompletedForToday = false;
+                        playerState.lastDate = systemDay;
+                        saveState();
+                        renderTasks(); 
+                    }
+                }
+
+                const timerEl = document.getElementById('countdown-timer');
+
+                // System Frozen Logic
+                if (playerState.questCompletedForToday) {
+                    timerEl.innerText = "QUEST COMPLETED! System frozen until 1:00 AM reset.";
+                    timerEl.classList.add('timer-frozen');
+                    timerEl.classList.remove('text-glow-red', 'animate-pulse');
+                    return; // Stop countdown ticking
+                } else {
+                    timerEl.classList.remove('timer-frozen');
+                    timerEl.classList.add('text-glow-red', 'animate-pulse');
+                }
+
+                // Countdown calc to next 1:00 AM
+                let deadline = new Date(now);
+                if (now.getHours() >= 1) {
+                    deadline.setDate(deadline.getDate() + 1);
+                }
+                deadline.setHours(1, 0, 0, 0);
+                
+                const diff = deadline - now;
+                const h = Math.floor(diff / (1000 * 60 * 60));
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                timerEl.innerText = `Time Remaining: ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+                
+                // Add red pulse effect in the last 1 hour
+                if (h === 0) {
+                    timerEl.style.animationDuration = '0.5s';
+                } else {
+                    timerEl.style.animationDuration = '1.5s';
+                }
+
+            }, 1000);
+        }
+
+        // ================= UI RENDERING =================
+        function updateUIFromState() {
+            document.getElementById('stat-level').innerText = playerState.level;
+            document.getElementById('lbl-curr-lvl').innerText = `LVL ${playerState.level}`;
+            document.getElementById('lbl-next-lvl').innerText = playerState.level >= maxLevel ? "MAX" : `LVL ${playerState.level + 1}`;
+            document.getElementById('global-diamond-total').innerText = playerState.diamonds;
+            
+            renderTasks();
+            renderStore();
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('task-container');
+            container.innerHTML = '';
+            
+            let activeTasks = [];
+            if (playerState.level <= 15) activeTasks = baseTasks;
+            else if (playerState.level <= 20) activeTasks = [...baseTasks, ...advancedTasks];
+            else activeTasks = masterTasks;
+            
+            currentTaskCount = activeTasks.length;
+
+            activeTasks.forEach((task, idx) => {
+                const isCompleted = playerState.completedTasks.includes(idx) || playerState.questCompletedForToday;
+                const label = document.createElement('label');
+                label.className = `quest-item w-full ${isCompleted ? 'completed' : ''}`;
+                label.innerHTML = `
+                    <input type="checkbox" class="custom-cb task-checkbox" data-idx="${idx}" ${isCompleted ? 'checked' : ''} ${playerState.questCompletedForToday ? 'disabled' : ''}>
+                    <div class="flex-1">
+                        <div class="q-title font-bold text-lg tracking-wide uppercase text-[#d4f0ff]">${task.title}</div>
+                        <div class="q-time sys-font text-sm text-[#00d2ff99] mt-1 tracking-widest">[ ${task.time} ]</div>
+                    </div>
+                `;
+
+                const cb = label.querySelector('.task-checkbox');
+                cb.addEventListener('change', async () => {
+                    initAudio(); 
+                    if (cb.checked) {
+                        playerState.completedTasks.push(idx);
+                        label.classList.add('completed');
+                        
+                        const randomMsg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+                        const sysBox = document.getElementById('sys-msg-box');
+                        sysBox.innerText = randomMsg;
+                        sysBox.classList.remove('msg-animate');
+                        void sysBox.offsetWidth;
+                        sysBox.classList.add('msg-animate');
+                    } else {
+                        playerState.completedTasks = playerState.completedTasks.filter(i => i !== idx);
+                        label.classList.remove('completed');
+                    }
+                    updateProgress();
+                    await saveState();
+                });
+                container.appendChild(label);
+            });
+            updateProgress();
+        }
+
+        function updateProgress() {
+            const btnLevelUp = document.getElementById('btn-levelup');
+
+            if (playerState.questCompletedForToday) {
+                document.getElementById('progress-bar').style.width = `100%`;
+                document.getElementById('lbl-progress').textContent = `100%`;
+                btnLevelUp.disabled = true;
+                btnLevelUp.classList.remove('ready');
+                btnLevelUp.innerText = "System Frozen";
+                return;
+            }
+
+            const checkedCount = playerState.completedTasks.length;
+            const percentage = (checkedCount / currentTaskCount) * 100;
+            
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+            document.getElementById('lbl-progress').textContent = `${Math.round(percentage)}%`;
+
+            if (checkedCount === currentTaskCount) {
+                btnLevelUp.disabled = false;
+                btnLevelUp.classList.add('ready');
+                btnLevelUp.innerText = "[ LEVEL UP ]";
+                document.getElementById('sys-msg-box').innerText = "সব টাস্ক কমপ্লিট! লেভেল আপ করো আর্কিটেক্ট! 🏆⚡";
+            } else {
+                btnLevelUp.disabled = true;
+                btnLevelUp.classList.remove('ready');
+                btnLevelUp.innerText = "Level Up";
+            }
+        }
+
+        function renderStore() {
+            const container = document.getElementById('store-container');
+            container.innerHTML = '';
+            swordData.forEach(sword => {
+                const isOwned = playerState.ownedSwords.includes(sword.id);
+                const card = document.createElement('div');
+                card.className = `sword-card rank-${sword.rank}`;
+                
+                let rankColor = "#9ca3af";
+                if(sword.rank === 'D') rankColor = "#4ade80";
+                if(sword.rank === 'C') rankColor = "#38bdf8";
+                if(sword.rank === 'B') rankColor = "#c084fc";
+                if(sword.rank === 'A') rankColor = "#f87171";
+                if(sword.rank === 'S') rankColor = "#facc15";
+
+                card.innerHTML = `
+                    <div class="sword-icon">${sword.icon}</div>
+                    <h3 class="sys-font font-bold text-[#d4f0ff] mb-1 leading-tight h-10 flex items-center justify-center">${sword.name}</h3>
+                    <div class="sys-font font-bold mb-2" style="color: ${rankColor}">[ Rank ${sword.rank} ]</div>
+                    <div class="sys-font font-bold text-glow-pink mb-2">${sword.price} 💎</div>
+                    <button class="btn-buy ${isOwned ? 'owned' : ''}" id="buy-btn-${sword.id}" ${isOwned ? 'disabled' : ''}>
+                        ${isOwned ? 'OWNED' : 'BUY'}
+                    </button>
+                `;
+                container.appendChild(card);
+
+                if(!isOwned) {
+                    const btn = card.querySelector(`#buy-btn-${sword.id}`);
+                    btn.addEventListener('click', async () => {
+                        if(playerState.diamonds >= sword.price) {
+                            playerState.diamonds -= sword.price;
+                            playerState.ownedSwords.push(sword.id);
+                            btn.innerText = "OWNED";
+                            btn.classList.add('owned');
+                            btn.disabled = true;
+                            
+                            document.getElementById('global-diamond-total').innerText = playerState.diamonds;
+                            showToast(`Purchased [${sword.name}]! ⚔️`, 'success');
+                            await saveState();
+                        } else {
+                            showToast('Not enough diamonds! / ডায়মন্ড কম আছে! 💎', 'error'); 
+                        }
+                    });
+                }
+            });
+        }
+
+        // ================= UTILS & BINDINGS =================
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.className = `toast-box toast-${type} show`;
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        function switchView(hideEl, showEl) {
+            hideEl.classList.remove('view-active');
+            hideEl.classList.add('view-hidden');
+            setTimeout(() => {
+                showEl.classList.remove('view-hidden');
+                showEl.classList.add('view-active');
+            }, 400);
+        }
+
+        document.getElementById('close-status').addEventListener('click', () => {
+            switchView(document.getElementById('win-status'), document.getElementById('win-quest'));
+            document.getElementById('btn-open-store').classList.remove('view-hidden');
+        });
+
+        document.getElementById('btn-levelup').addEventListener('click', () => {
+            if(!document.getElementById('btn-levelup').disabled) {
+                document.getElementById('btn-open-store').classList.add('view-hidden');
+                pendingDiamonds = Math.floor(Math.random() * (55 - 25 + 1)) + 25;
+                document.getElementById('reward-amount').innerText = `+${pendingDiamonds} 💎`;
+                switchView(document.getElementById('win-quest'), document.getElementById('win-reward'));
+            }
+        });
+
+        async function handleBuffSelection(buffName, buffMsg, toastClass) {
+            playerState.diamonds += pendingDiamonds;
+            document.getElementById('global-diamond-total').innerText = playerState.diamonds;
+            document.getElementById('btn-open-store').classList.remove('view-hidden');
+            showToast(buffMsg, toastClass);
+
+            playerState.questCompletedForToday = true;
+
+            if (playerState.level < maxLevel) {
+                playerState.level++;
+                // DO NOT clear tasks here. System is frozen and tasks remain visually checked until 1:00 AM reset.
+                
+                await saveState();
+                updateUIFromState();
+                
+                document.getElementById('sys-msg-box').innerText = `[ SYSTEM ] ${buffName} অ্যাক্টিভেটেড! সিস্টেম রাত ১টা পর্যন্ত ফ্রিজ করা হলো! ⚡`;
+                switchView(document.getElementById('win-reward'), document.getElementById('win-quest'));
+            } else {
+                await saveState();
+                document.getElementById('btn-open-store').classList.add('view-hidden');
+                switchView(document.getElementById('win-reward'), document.getElementById('win-max'));
+            }
+        }
+
+        const selectableBuffs = document.querySelectorAll('.buff-selectable');
+        const btnClaimGifts = document.getElementById('btn-claim-gifts');
+        let selectedBuffs = [];
+
+        selectableBuffs.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const name = btn.getAttribute('data-name');
+                if (selectedBuffs.includes(name)) {
+                    selectedBuffs = selectedBuffs.filter(b => b !== name);
+                    btn.classList.remove('selected');
+                } else {
+                    if (selectedBuffs.length < 2) {
+                        selectedBuffs.push(name);
+                        btn.classList.add('selected');
+                    } else {
+                        showToast("You can only select exactly 2 gifts! 🎁", 'error');
+                    }
+                }
+
+                if (selectedBuffs.length === 2) {
+                    btnClaimGifts.disabled = false;
+                    btnClaimGifts.classList.add('ready');
+                } else {
+                    btnClaimGifts.disabled = true;
+                    btnClaimGifts.classList.remove('ready');
+                }
+            });
+        });
+
+        btnClaimGifts.addEventListener('click', async () => {
+            if (selectedBuffs.length === 2) {
+                const buffNames = selectedBuffs.join(' & ');
+                const buffMsg = `[ ${buffNames} ] Activated! 🎁✨`;
+                await handleBuffSelection(buffNames, buffMsg, 'success');
+                
+                // Reset selections for next time
+                selectedBuffs = [];
+                selectableBuffs.forEach(b => b.classList.remove('selected'));
+                btnClaimGifts.disabled = true;
+                btnClaimGifts.classList.remove('ready');
+            }
+        });
+
+        document.getElementById('btn-open-store').addEventListener('click', () => {
+            renderStore(); // Refresh store view
+            switchView(document.getElementById('win-quest'), document.getElementById('win-store'));
+            document.getElementById('btn-open-store').classList.add('view-hidden');
+        });
+
+        document.getElementById('btn-close-store').addEventListener('click', () => {
+            switchView(document.getElementById('win-store'), document.getElementById('win-quest'));
+            document.getElementById('btn-open-store').classList.remove('view-hidden');
+        });
+
+        // ================= BOOTSTRAP APP =================
+        async function bootSystem() {
+            if (isFirebaseActive) {
+                try {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const cred = await signInWithCustomToken(auth, __initial_auth_token);
+                        user = cred.user;
+                    } else {
+                        const cred = await signInAnonymously(auth);
+                        user = cred.user;
+                    }
+                    await loadState();
+                } catch (error) {
+                    console.error("Firebase Auth Error:", error);
+                    updateUIFromState(); // Fallback to local memory if auth fails
+                }
+            } else {
+                updateUIFromState();
+            }
+
+            document.getElementById('loader').style.display = 'none';
+            document.getElementById('win-status').classList.remove('view-hidden');
+            document.getElementById('win-status').classList.add('view-active');
+            
+            startMidnightTimer();
+        }
+
+        // Start Boot Process
+        bootSystem();
+    </script>
+</body>
+</html>
